@@ -1,0 +1,4 @@
+[submodule "fxswap-refuel"]
+	path = fxswap-refuel
+	url = https://github.com/martinkrung/fxswap-refuel.git
+	branch = claude/vyper-contract-logic-019V2Q1WnnDWWdVJn6SyBpnD
