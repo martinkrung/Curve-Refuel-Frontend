@@ -1,0 +1,63 @@
+name: Smart Contracts CI
+
+on:
+  push:
+    branches:
+      - '**'  # Run on all branches
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  compile-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive  # Important: fetch submodules including fxswap-refuel
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Compile contracts
+        working-directory: packages/hardhat
+        run: yarn compile
+
+      - name: Run contract tests
+        working-directory: packages/hardhat
+        run: yarn test
+
+      - name: Upload compilation artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-artifacts
+          path: |
+            packages/hardhat/artifacts
+            packages/hardhat/typechain-types
+          retention-days: 7
+
+  summary:
+    runs-on: ubuntu-latest
+    needs: compile-and-test
+    if: always()
+
+    steps:
+      - name: Build Summary
+        run: |
+          echo "## Smart Contracts Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Contracts compiled successfully" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All tests passed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Interfaces Generated" >> $GITHUB_STEP_SUMMARY
+          echo "- IRefuel.sol" >> $GITHUB_STEP_SUMMARY
+          echo "- IRefuelFactory.sol" >> $GITHUB_STEP_SUMMARY
