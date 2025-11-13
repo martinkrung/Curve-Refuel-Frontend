@@ -1,0 +1,77 @@
+name: Deploy Contracts to Sepolia
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm deployment to Sepolia'
+        required: true
+        default: ''
+
+jobs:
+  deploy-contracts:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'deploy'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Compile contracts
+        working-directory: packages/hardhat
+        run: yarn compile
+
+      - name: Deploy to Sepolia
+        working-directory: packages/hardhat
+        run: yarn deploy --network sepolia
+        env:
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          ALCHEMY_API_KEY: ${{ secrets.NEXT_PUBLIC_ALCHEMY_API_KEY }}
+
+      - name: Generate deployment summary
+        run: |
+          echo "## 🎉 Contracts Deployed to Sepolia!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Your contracts have been successfully deployed to Sepolia testnet." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check deployment details in the artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "2. Verify contracts on [Sepolia Etherscan](https://sepolia.etherscan.io/)" >> $GITHUB_STEP_SUMMARY
+          echo "3. Deploy frontend to Vercel to interact with your contracts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Useful Links:" >> $GITHUB_STEP_SUMMARY
+          echo "- [Sepolia Etherscan](https://sepolia.etherscan.io/)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Sepolia Faucet](https://www.alchemy.com/faucets/ethereum-sepolia)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload deployment artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-info
+          path: |
+            packages/hardhat/deployments/sepolia
+            packages/nextjs/contracts
+          retention-days: 30
+
+      - name: Commit generated contract files
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add packages/nextjs/contracts
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update deployed contract files for Sepolia"
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
